@@ -188,25 +188,32 @@ class LangSmithTracer:
         )
         
         try:
-            # Use traceable decorator approach for better compatibility
-            @traceable(
+            with tracing_context(
                 name="contract_analysis",
                 metadata=metadata,
                 tags=["contract", "analysis", perspectiva, llm_provider]
-            )
-            def traced_context():
-                current_run = get_current_run_tree()
-                return current_run
-            
-            trace = traced_context()
-            yield trace
-            
-            # Log success if trace is available
-            if trace and LANGSMITH_AVAILABLE:
-                logger.info(f"Contract analysis trace completed for {metadata.get('document_id')}")
-                    
+            ) as trace:
+                yield trace
+                
+                if trace:
+                    try:
+                        trace.update(
+                            outputs={"status": "completed"},
+                            metadata={**metadata, "success": True}
+                        )
+                    except Exception:
+                        # Avoid crashing on tracing update failures
+                        pass
         except Exception as e:
             if LANGSMITH_AVAILABLE:
+                try:
+                    if 'trace' in locals() and trace:
+                        trace.update(
+                            outputs={"status": "failed", "error": str(e)},
+                            metadata={**metadata, "success": False, "error": str(e)}
+                        )
+                except Exception:
+                    pass
                 logger.error(f"Contract analysis trace failed: {e}")
             raise
     
@@ -238,25 +245,31 @@ class LangSmithTracer:
         )
         
         try:
-            # Use traceable decorator approach for better compatibility
-            @traceable(
+            with tracing_context(
                 name="clause_analysis",
                 metadata=metadata,
                 tags=["clause", "analysis", pattern_type, f"level_{clause_level}"]
-            )
-            def traced_context():
-                current_run = get_current_run_tree()
-                return current_run
-            
-            trace = traced_context()
-            yield trace
-            
-            # Log success if trace is available
-            if trace and LANGSMITH_AVAILABLE:
-                logger.info(f"Clause analysis trace completed for {metadata.get('clause_id')}")
-                    
+            ) as trace:
+                yield trace
+                
+                if trace:
+                    try:
+                        trace.update(
+                            outputs={"status": "completed"},
+                            metadata={**metadata, "success": True}
+                        )
+                    except Exception:
+                        pass
         except Exception as e:
             if LANGSMITH_AVAILABLE:
+                try:
+                    if 'trace' in locals() and trace:
+                        trace.update(
+                            outputs={"status": "failed", "error": str(e)},
+                            metadata={**metadata, "success": False, "error": str(e)}
+                        )
+                except Exception:
+                    pass
                 logger.error(f"Clause analysis trace failed: {e}")
             raise
 

@@ -13,6 +13,13 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 
 from pydantic_ai import Agent, RunContext
+try:
+    from langsmith import traceable as ls_traceable  # type: ignore
+except Exception:  # LangSmith opcional
+    def ls_traceable(*args, **kwargs):  # type: ignore
+        def decorator(func):
+            return func
+        return decorator
 
 from ..models import (
     ClauseAnalysis,
@@ -232,7 +239,7 @@ class ContractAnalyzer:
         logger.info(f"Starting full contract analysis for {extraction_result.document_id}")
         logger.info(f"Analyzing {len(clauses)} clauses from perspective: {perspectiva}")
         
-        # Initialize LangSmith tracing context
+        # Initialize LangSmith tracing context (sets parent metadata)
         with tracer.trace_contract_analysis(
             document_id=extraction_result.document_id,
             filename=extraction_result.metadata.filename,
@@ -249,52 +256,66 @@ class ContractAnalyzer:
                 include_negotiation_questions=True,
                 llm_provider=self.llm_provider
             )
-            
-            try:
-                # Analyze clauses in batches to avoid overwhelming the LLM
-                analyzed_clauses = await self._analyze_clauses_batch(clauses, dependencies)
-                
-                # Calculate processing time
-                processing_time = (datetime.now() - start_time).total_seconds()
-                
-                # Generate risk summary
-                risk_summary = self._calculate_risk_summary(analyzed_clauses)
-                
-                # Calculate confidence score based on analysis quality
-                confidence_score = self._calculate_confidence_score(analyzed_clauses)
-                
-                # Log metrics to LangSmith
-                log_analysis_metrics(
-                    document_id=extraction_result.document_id,
-                    processing_time=processing_time,
-                    clause_count=len(analyzed_clauses),
-                    risk_summary=risk_summary,
-                    confidence_score=confidence_score
-                )
-                
-                response = ContractAnalysisResponse(
-                    document_id=extraction_result.document_id,
-                    filename=extraction_result.metadata.filename,
-                    contract_summary=contract_summary,
-                    clauses=analyzed_clauses,
-                    total_pages=extraction_result.metadata.page_count,
-                    total_clauses=len(analyzed_clauses),
-                    processing_time=processing_time,
-                    llm_provider=self.llm_provider or settings.llm_provider,
-                    llm_model=settings.get_current_model(),
-                    confidence_score=confidence_score,
-                    risk_summary=risk_summary,
-                    created_at=datetime.now()
-                )
-                
-                logger.info(f"Contract analysis completed in {processing_time:.2f}s")
-                logger.info(f"Risk summary: {risk_summary}")
-                
-                return response
-                
-            except Exception as e:
-                logger.error(f"Contract analysis failed: {str(e)}")
-                raise ContractAnalysisError(f"Analysis failed: {str(e)}") from e
+
+            @ls_traceable(
+                name="contract_analysis",
+                metadata={
+                    "document_id": extraction_result.document_id,
+                    "filename": extraction_result.metadata.filename,
+                    "perspectiva": perspectiva,
+                    "llm_provider": self.llm_provider or settings.llm_provider,
+                    "total_clauses": len(clauses),
+                    "total_pages": extraction_result.metadata.page_count,
+                },
+                tags=["contract", "analysis", perspectiva, self.llm_provider or settings.llm_provider],
+            )
+            async def _run_contract_analysis_inner():
+                try:
+                    # Analyze clauses in batches to avoid overwhelming the LLM
+                    analyzed_clauses = await self._analyze_clauses_batch(clauses, dependencies)
+
+                    # Calculate processing time
+                    processing_time = (datetime.now() - start_time).total_seconds()
+
+                    # Generate risk summary
+                    risk_summary = self._calculate_risk_summary(analyzed_clauses)
+
+                    # Calculate confidence score based on analysis quality
+                    confidence_score = self._calculate_confidence_score(analyzed_clauses)
+
+                    # Log metrics to LangSmith
+                    log_analysis_metrics(
+                        document_id=extraction_result.document_id,
+                        processing_time=processing_time,
+                        clause_count=len(analyzed_clauses),
+                        risk_summary=risk_summary,
+                        confidence_score=confidence_score,
+                    )
+
+                    response = ContractAnalysisResponse(
+                        document_id=extraction_result.document_id,
+                        filename=extraction_result.metadata.filename,
+                        contract_summary=contract_summary,
+                        clauses=analyzed_clauses,
+                        total_pages=extraction_result.metadata.page_count,
+                        total_clauses=len(analyzed_clauses),
+                        processing_time=processing_time,
+                        llm_provider=self.llm_provider or settings.llm_provider,
+                        llm_model=settings.get_current_model(),
+                        confidence_score=confidence_score,
+                        risk_summary=risk_summary,
+                        created_at=datetime.now(),
+                    )
+
+                    logger.info(f"Contract analysis completed in {processing_time:.2f}s")
+                    logger.info(f"Risk summary: {risk_summary}")
+
+                    return response
+                except Exception as e:
+                    logger.error(f"Contract analysis failed: {str(e)}")
+                    raise ContractAnalysisError(f"Analysis failed: {str(e)}") from e
+
+            return await _run_contract_analysis_inner()
     
     async def analyze_single_clause(
         self,
@@ -315,63 +336,87 @@ class ContractAnalyzer:
         """
         logger.info(f"Analyzing clause: {clause.clause_id}")
         
-        # Initialize LangSmith tracing for individual clause
+        # Initialize LangSmith tracing for individual clause (parent context)
         with tracer.trace_clause_analysis(
             clause_id=clause.clause_id,
             clause_number=clause.clause_number,
             clause_level=clause.level or 1,
             clause_length=len(clause.text),
-            pattern_type="numbered" if clause.clause_number else "paragraph"
+            pattern_type="numbered" if clause.clause_number else "paragraph",
         ):
-            try:
-                # Prepare the prompt with clause information
-                clause_prompt = self._prepare_clause_prompt(clause, dependencies, context)
-                
-                # Create agent with appropriate provider if specified
-                agent_to_use = contract_agent
-                if dependencies.llm_provider and dependencies.llm_provider != settings.llm_provider:
-                    # Create temporary agent with different provider
-                    agent_to_use = Agent(
-                        get_contract_llm_model(dependencies.llm_provider),
-                        deps_type=AnalysisDependencies,
-                        output_type=ClauseAnalysis,
-                        system_prompt=SYSTEM_PROMPT + "\n\n" + CLAUSE_ANALYSIS_EXAMPLES
+            @ls_traceable(
+                name="clause_analysis",
+                metadata={
+                    "clause_id": clause.clause_id,
+                    "clause_number": clause.clause_number,
+                    "clause_level": clause.level or 1,
+                    "clause_length": len(clause.text),
+                    "pattern_type": "numbered" if clause.clause_number else "paragraph",
+                },
+                tags=[
+                    "clause",
+                    "analysis",
+                    "numbered" if clause.clause_number else "paragraph",
+                    f"level_{clause.level or 1}",
+                ],
+            )
+            async def _run_clause_analysis_inner():
+                try:
+                    # Prepare the prompt with clause information
+                    clause_prompt = self._prepare_clause_prompt(clause, dependencies, context)
+
+                    # Create agent with appropriate provider if specified
+                    agent_to_use = contract_agent
+                    if dependencies.llm_provider and dependencies.llm_provider != settings.llm_provider:
+                        # Create temporary agent with different provider
+                        agent_to_use = Agent(
+                            get_contract_llm_model(dependencies.llm_provider),
+                            deps_type=AnalysisDependencies,
+                            output_type=ClauseAnalysis,
+                            system_prompt=SYSTEM_PROMPT + "\n\n" + CLAUSE_ANALYSIS_EXAMPLES,
+                        )
+                        # Register tools with temporary agent
+                        self._register_tools_with_agent(agent_to_use)
+
+                    # Run analysis with retry logic
+                    result = await self._run_with_retry(
+                        lambda: agent_to_use.run(clause_prompt, deps=dependencies)
                     )
-                    # Register tools with temporary agent
-                    self._register_tools_with_agent(agent_to_use)
-                
-                # Run analysis with retry logic
-                result = await self._run_with_retry(
-                    lambda: agent_to_use.run(clause_prompt, deps=dependencies)
-                )
-                
-                # Extract analysis from result and ensure coordinates are preserved  
-                if hasattr(result, 'output'):
-                    analysis = result.output
-                elif hasattr(result, 'data'):
-                    analysis = result.data
-                else:
-                    # Fallback for direct result
-                    analysis = result
-                    
-                # Ensure we have a ClauseAnalysis object
-                if not isinstance(analysis, ClauseAnalysis):
-                    logger.error(f"Expected ClauseAnalysis, got {type(analysis)}: {analysis}")
-                    # Create fallback analysis
-                    return self._create_fallback_analysis(clause, f"Invalid result type: {type(analysis)}")
-                
-                # Set coordinates and clause info
-                analysis.coordenadas = clause.coordinates
-                analysis.clause_id = clause.clause_id
-                analysis.clausula_numero = clause.clause_number
-                
-                logger.info(f"Clause analysis completed: {analysis.clause_id}, Flag: {analysis.bandeira}")
-                return analysis
-                
-            except Exception as e:
-                logger.error(f"Single clause analysis failed: {str(e)}")
-                # Return fallback analysis to avoid complete failure
-                return self._create_fallback_analysis(clause, str(e))
+
+                    # Extract analysis from result and ensure coordinates are preserved
+                    if hasattr(result, "output"):
+                        analysis = result.output
+                    elif hasattr(result, "data"):
+                        analysis = result.data
+                    else:
+                        # Fallback for direct result
+                        analysis = result
+
+                    # Ensure we have a ClauseAnalysis object
+                    if not isinstance(analysis, ClauseAnalysis):
+                        logger.error(
+                            f"Expected ClauseAnalysis, got {type(analysis)}: {analysis}"
+                        )
+                        # Create fallback analysis
+                        return self._create_fallback_analysis(
+                            clause, f"Invalid result type: {type(analysis)}"
+                        )
+
+                    # Set coordinates and clause info
+                    analysis.coordenadas = clause.coordinates
+                    analysis.clause_id = clause.clause_id
+                    analysis.clausula_numero = clause.clause_number
+
+                    logger.info(
+                        f"Clause analysis completed: {analysis.clause_id}, Flag: {analysis.bandeira}"
+                    )
+                    return analysis
+                except Exception as e:
+                    logger.error(f"Single clause analysis failed: {str(e)}")
+                    # Return fallback analysis to avoid complete failure
+                    return self._create_fallback_analysis(clause, str(e))
+
+            return await _run_clause_analysis_inner()
     
     async def _analyze_clauses_batch(
         self,
