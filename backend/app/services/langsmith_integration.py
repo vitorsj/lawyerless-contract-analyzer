@@ -14,7 +14,7 @@ from datetime import datetime
 
 try:
     from langsmith import Client, traceable
-    from langsmith.run_helpers import tracing_context
+    from langsmith.run_helpers import tracing_context, get_current_run_tree
     LANGSMITH_AVAILABLE = True
 except ImportError:
     LANGSMITH_AVAILABLE = False
@@ -27,6 +27,9 @@ except ImportError:
     def tracing_context(*args, **kwargs):
         from contextlib import nullcontext
         return nullcontext()
+    
+    def get_current_run_tree():
+        return None
 
 from ..settings import settings
 
@@ -185,30 +188,26 @@ class LangSmithTracer:
         )
         
         try:
-            with tracing_context(
+            # Use traceable decorator approach for better compatibility
+            @traceable(
                 name="contract_analysis",
                 metadata=metadata,
                 tags=["contract", "analysis", perspectiva, llm_provider]
-            ) as trace:
-                yield trace
-                
-                # Add success metadata
-                if trace:
-                    trace.update(
-                        outputs={"status": "completed"},
-                        metadata={**metadata, "success": True}
-                    )
+            )
+            def traced_context():
+                current_run = get_current_run_tree()
+                return current_run
+            
+            trace = traced_context()
+            yield trace
+            
+            # Log success if trace is available
+            if trace and LANGSMITH_AVAILABLE:
+                logger.info(f"Contract analysis trace completed for {metadata.get('document_id')}")
                     
         except Exception as e:
             if LANGSMITH_AVAILABLE:
-                try:
-                    if 'trace' in locals():
-                        trace.update(
-                            outputs={"status": "failed", "error": str(e)},
-                            metadata={**metadata, "success": False, "error": str(e)}
-                        )
-                except Exception:
-                    pass  # Don't let tracing errors break the main flow
+                logger.error(f"Contract analysis trace failed: {e}")
             raise
     
     @contextmanager
@@ -239,29 +238,26 @@ class LangSmithTracer:
         )
         
         try:
-            with tracing_context(
+            # Use traceable decorator approach for better compatibility
+            @traceable(
                 name="clause_analysis",
                 metadata=metadata,
                 tags=["clause", "analysis", pattern_type, f"level_{clause_level}"]
-            ) as trace:
-                yield trace
-                
-                if trace:
-                    trace.update(
-                        outputs={"status": "completed"},
-                        metadata={**metadata, "success": True}
-                    )
+            )
+            def traced_context():
+                current_run = get_current_run_tree()
+                return current_run
+            
+            trace = traced_context()
+            yield trace
+            
+            # Log success if trace is available
+            if trace and LANGSMITH_AVAILABLE:
+                logger.info(f"Clause analysis trace completed for {metadata.get('clause_id')}")
                     
         except Exception as e:
             if LANGSMITH_AVAILABLE:
-                try:
-                    if 'trace' in locals():
-                        trace.update(
-                            outputs={"status": "failed", "error": str(e)},
-                            metadata={**metadata, "success": False, "error": str(e)}
-                        )
-                except Exception:
-                    pass
+                logger.error(f"Clause analysis trace failed: {e}")
             raise
 
 
