@@ -53,16 +53,16 @@ class ClauseSegmenter:
     def _compile_patterns(self):
         """Compile regular expressions for clause detection."""
         
-        # Pattern 1: Numbered clauses (1., 1.1., 1.1.1., etc.)
-        # Enhanced to work with both line-based and continuous text
+        # Pattern 1: Numbered clauses (1, 1.1, 1.2, 2, 2.1, 2.2.1, etc.)
+        # Matches hierarchical numbering at the beginning of lines
         self.numbered_pattern = re.compile(
-            r'(?:^|\s)(\d+(?:\.\d+)*)\.\s+([A-ZÁÊÇÕÜ][^\n.]*?)(?=\s*(?:\d+(?:\.\d+)*\.|CLÁUSULA|SEÇÃO|$))',
-            re.MULTILINE | re.IGNORECASE
+            r'(?:^|\n)\s*(\d+(?:\.\d+)*)\s*\.?\s*[-–—]?\s*([^\r\n]*)',
+            re.MULTILINE
         )
         
         # Pattern 2: "CLÁUSULA" patterns - Enhanced for continuous text
         self.clausula_pattern = re.compile(
-            r'(?:^|\s)(?:CLÁUSULA|CLAUSULA)\s*(\d+(?:\.\d+)*)?[ªº]?\s*[-–—]?\s*([A-ZÁÊÇÕÜ][^\n]*?)(?=\s*(?:\d+(?:\.\d+)*\.|CLÁUSULA|SEÇÃO|$))',
+            r'(?:^|\n)\s*(?:CLÁUSULA|CLAUSULA)\s*(\d+(?:\.\d+)*)?[ªº]?\s*[-–—]?\s*([^\n]*?)(?=\n\s*(?:CLÁUSULA|SEÇÃO|\d+\.|$))',
             re.MULTILINE | re.IGNORECASE
         )
         
@@ -136,12 +136,26 @@ class ClauseSegmenter:
             logger.warning("No text found for clause segmentation")
             return []
         
+        logger.info(f"Full text length: {len(full_text)} characters")
+        logger.debug(f"Full text preview: {full_text[:500]}...")
+        
         # Detect clause boundaries using multiple patterns
         clause_matches = self._detect_clause_boundaries(full_text)
         
+        logger.info(f"Detected {len(clause_matches)} clause matches")
+        for i, match in enumerate(clause_matches):
+            logger.debug(f"Match {i+1}: {match.pattern_type} - {match.number} - '{match.title}' (confidence: {match.confidence})")
+        
         if not clause_matches:
-            logger.warning("No clause patterns detected, creating single clause")
-            return self._create_single_clause(extraction_result)
+            logger.warning("No clause patterns detected, trying paragraph-based segmentation")
+            # Try paragraph-based segmentation as fallback
+            paragraph_clauses = self._create_paragraph_based_clauses(extraction_result)
+            if len(paragraph_clauses) > 1:
+                logger.info(f"Created {len(paragraph_clauses)} clauses using paragraph segmentation")
+                return paragraph_clauses
+            else:
+                logger.warning("Paragraph segmentation also failed, creating single clause")
+                return self._create_single_clause(extraction_result)
         
         # Sort matches by position
         clause_matches.sort(key=lambda m: m.start_pos)
@@ -172,14 +186,17 @@ class ClauseSegmenter:
         all_matches = []
         
         # Pattern 1: Numbered clauses
-        matches = self.numbered_pattern.finditer(text)
+        matches = list(self.numbered_pattern.finditer(text))
+        logger.debug(f"Found {len(matches)} numbered clause matches")
         for match in matches:
             confidence = 0.9  # High confidence for numbered patterns
+            title_text = match.group(2).strip() if match.group(2) else None
+            logger.debug(f"Numbered match: '{match.group(1)}' - '{title_text}' at {match.start()}-{match.end()}")
             all_matches.append(ClauseMatch(
                 start_pos=match.start(),
                 end_pos=match.end(),
                 text=match.group(0),
-                title=match.group(2).strip() if match.group(2) else None,
+                title=title_text,
                 number=match.group(1),
                 level=len(match.group(1).split('.')),
                 pattern_type="numbered",
@@ -187,15 +204,18 @@ class ClauseSegmenter:
             ))
         
         # Pattern 2: CLÁUSULA patterns  
-        matches = self.clausula_pattern.finditer(text)
+        matches = list(self.clausula_pattern.finditer(text))
+        logger.debug(f"Found {len(matches)} CLAUSULA clause matches")
         for match in matches:
             confidence = 0.95  # Very high confidence for explicit clauses
             number = match.group(1) if match.group(1) else None
+            title_text = match.group(2).strip() if match.group(2) else None
+            logger.debug(f"Clausula match: '{number}' - '{title_text}' at {match.start()}-{match.end()}")
             all_matches.append(ClauseMatch(
                 start_pos=match.start(),
                 end_pos=match.end(),
                 text=match.group(0),
-                title=match.group(2).strip() if match.group(2) else None,
+                title=title_text,
                 number=number,
                 level=self._calculate_hierarchical_level(number, "clausula"),
                 pattern_type="clausula",
@@ -409,20 +429,55 @@ class ClauseSegmenter:
         processed_clauses = []
         
         for i, match in enumerate(clause_matches):
-            # Determine clause text boundaries
-            start_pos = match.start_pos
-            
-            # End position is start of next clause or end of document
-            if i + 1 < len(clause_matches):
-                end_pos = clause_matches[i + 1].start_pos
+            # For numbered clauses, find the actual start of the clause content
+            # The regex match might only capture the number + first line
+            if match.pattern_type == "numbered":
+                # Find the full line that contains the clause number
+                lines = full_text.split('\n')
+                clause_start_line_idx = None
+                
+                # Find which line contains this clause number
+                for line_idx, line in enumerate(lines):
+                    if match.number and line.strip().startswith(match.number):
+                        clause_start_line_idx = line_idx
+                        break
+                
+                if clause_start_line_idx is not None:
+                    # Calculate character position of this line
+                    start_pos = sum(len(line) + 1 for line in lines[:clause_start_line_idx])  # +1 for \n
+                    
+                    # Find end position (start of next clause or end of document)
+                    if i + 1 < len(clause_matches):
+                        # Find the next clause's line
+                        next_match = clause_matches[i + 1]
+                        end_pos = next_match.start_pos
+                        
+                        # For numbered clauses, be more precise
+                        if next_match.pattern_type == "numbered":
+                            for next_line_idx, line in enumerate(lines[clause_start_line_idx + 1:], start=clause_start_line_idx + 1):
+                                if next_match.number and line.strip().startswith(next_match.number):
+                                    end_pos = sum(len(line) + 1 for line in lines[:next_line_idx])
+                                    break
+                    else:
+                        end_pos = len(full_text)
+                else:
+                    # Fallback to original positions
+                    start_pos = match.start_pos
+                    end_pos = clause_matches[i + 1].start_pos if i + 1 < len(clause_matches) else len(full_text)
             else:
-                end_pos = len(full_text)
+                # For non-numbered clauses, use original logic
+                start_pos = match.start_pos
+                end_pos = clause_matches[i + 1].start_pos if i + 1 < len(clause_matches) else len(full_text)
             
             # Extract clause text
             clause_text = full_text[start_pos:end_pos].strip()
             
             if not clause_text:
                 continue
+            
+            # Clean up clause text (remove extra whitespace, normalize line breaks)
+            clause_text = re.sub(r'\n\s*\n\s*\n+', '\n\n', clause_text)  # Normalize multiple line breaks
+            clause_text = re.sub(r'[ \t]+', ' ', clause_text)  # Normalize spaces
             
             # Generate stable clause ID
             clause_id = self._generate_clause_id(
@@ -432,7 +487,7 @@ class ClauseSegmenter:
                 extraction_result.document_id
             )
             
-            # Estimate coordinates (simplified - could be improved with better mapping)
+            # Estimate coordinates
             coordinates = self._estimate_clause_coordinates(
                 start_pos, 
                 end_pos, 
@@ -440,8 +495,11 @@ class ClauseSegmenter:
                 extraction_result
             )
             
-            # Create title
-            title = self._create_clause_title(match)
+            # Create title - for numbered clauses, extract title from first line content
+            if match.pattern_type == "numbered" and match.title:
+                title = f"{match.number}. {match.title.strip()}"
+            else:
+                title = self._create_clause_title(match)
             
             processed_clause = ProcessedClause(
                 clause_id=clause_id,
@@ -453,6 +511,8 @@ class ClauseSegmenter:
             )
             
             processed_clauses.append(processed_clause)
+            
+            logger.debug(f"Created clause {match.number}: {len(clause_text)} chars, title: '{title}'")
         
         return processed_clauses
     
@@ -595,6 +655,68 @@ class ClauseSegmenter:
             else:
                 return f"{prefix}"
     
+    def _create_paragraph_based_clauses(self, extraction_result: PDFExtractionResult) -> List[ProcessedClause]:
+        """
+        Create clauses based on paragraph breaks as fallback.
+        
+        Args:
+            extraction_result: PDF extraction result
+        
+        Returns:
+            List of ProcessedClause objects based on paragraphs
+        """
+        full_text = extraction_result.full_text
+        
+        # Split by double line breaks (paragraphs)
+        paragraphs = re.split(r'\n\s*\n', full_text.strip())
+        
+        # Filter out very short paragraphs and page markers
+        valid_paragraphs = []
+        for para in paragraphs:
+            para = para.strip()
+            if (len(para) > 50 and  # At least 50 characters
+                not re.match(r'^---\s*Página\s+\d+\s*---$', para) and  # Skip page markers
+                not para.lower().startswith('página')):  # Skip page references
+                valid_paragraphs.append(para)
+        
+        if len(valid_paragraphs) <= 1:
+            return []  # Fall back to single clause
+        
+        clauses = []
+        char_position = 0
+        
+        for i, paragraph in enumerate(valid_paragraphs):
+            # Find position of this paragraph in the full text
+            para_start = full_text.find(paragraph, char_position)
+            if para_start == -1:
+                para_start = char_position
+            
+            para_end = para_start + len(paragraph)
+            char_position = para_end
+            
+            # Generate clause ID
+            clause_id = f"para_{extraction_result.document_id}_{i+1}_{hashlib.md5(paragraph[:100].encode()).hexdigest()[:8]}"
+            
+            # Estimate coordinates
+            coordinates = self._estimate_clause_coordinates(
+                para_start, para_end, full_text, extraction_result
+            )
+            
+            # Create title based on first 50 characters
+            title = paragraph[:50].strip()
+            if len(paragraph) > 50:
+                title += "..."
+                
+            clauses.append(ProcessedClause(
+                clause_id=clause_id,
+                text=paragraph,
+                coordinates=coordinates,
+                title=f"Parágrafo {i+1}: {title}",
+                level=1
+            ))
+        
+        return clauses
+
     def _create_single_clause(self, extraction_result: PDFExtractionResult) -> List[ProcessedClause]:
         """
         Create single clause when no patterns are detected.
