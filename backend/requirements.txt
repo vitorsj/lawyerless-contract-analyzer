@@ -9,6 +9,9 @@ pydantic-ai-slim>=0.6.2
 pydantic-settings>=2.5.2
 openai>=1.99.8
 
+# Observability and tracing
+langsmith>=0.1.147
+
 # PDF processing
 pdfplumber==0.11.4
 pypdf==4.3.1

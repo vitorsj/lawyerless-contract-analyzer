@@ -26,6 +26,7 @@ from ..models import (
 )
 from ..services import PDFProcessor, ClauseSegmenter, ContractExtractor
 from ..services.llm_providers import list_available_providers, get_provider_info
+from ..services.langsmith_integration import get_tracing_status
 from ..agents import analyze_contract_clauses
 from ..settings import settings
 
@@ -653,3 +654,27 @@ async def api_health():
         "current_llm_provider": settings.llm_provider,
         "timestamp": datetime.now().isoformat()
     }
+
+
+@router.get("/observability/status")
+async def get_observability_status():
+    """
+    Get observability and tracing status information.
+    
+    Returns:
+        LangSmith tracing configuration and status
+    """
+    try:
+        tracing_status = get_tracing_status()
+        return {
+            "observability": {
+                "langsmith": tracing_status
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Failed to get observability status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Falha ao obter status de observabilidade: {str(e)}"
+        )

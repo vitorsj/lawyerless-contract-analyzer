@@ -86,6 +86,13 @@ class Settings(BaseSettings):
     risk_analysis_enabled: bool = Field(default=True)
     negotiation_questions_count: int = Field(default=5)
     
+    # LangSmith Configuration (Observability)
+    langsmith_api_key: Optional[str] = Field(default=None)
+    langsmith_project: str = Field(default="lawyerless-contract-analyzer")
+    langsmith_endpoint: str = Field(default="https://api.smith.langchain.com")
+    langsmith_enabled: bool = Field(default=False)
+    langsmith_sample_rate: float = Field(default=1.0)  # 1.0 = trace all requests
+    
     @field_validator("llm_provider")
     @classmethod
     def validate_provider(cls, v):
@@ -159,6 +166,14 @@ class Settings(BaseSettings):
         """Ensure temperature is between 0 and 1."""
         if not 0 <= v <= 1:
             raise ValueError("Temperature must be between 0 and 1")
+        return v
+    
+    @field_validator("langsmith_sample_rate")
+    @classmethod
+    def validate_sample_rate(cls, v):
+        """Ensure sample rate is between 0 and 1."""
+        if not 0 <= v <= 1:
+            raise ValueError("LangSmith sample rate must be between 0 and 1")
         return v
 
 
