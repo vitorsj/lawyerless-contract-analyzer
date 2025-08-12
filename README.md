@@ -79,7 +79,7 @@ export LLM_MODEL=gpt-4o-mini
 cd backend
 
 # Criar ambiente virtual
-python -m venv venv_linux
+python3 -m venv venv_linux
 source venv_linux/bin/activate  # Linux/Mac
 # ou
 venv_linux\Scripts\activate     # Windows

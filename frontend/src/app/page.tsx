@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import FileUpload from '@/components/FileUpload'
+import LLMProviderSelector from '@/components/LLMProviderSelector'
 
 export default function HomePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState<any>(null)
   const [analysis, setAnalysis] = useState<any>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<string>('openai')
 
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file)
@@ -19,6 +21,7 @@ export default function HomePage() {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('perspectiva', 'fundador') // Default perspective
+      formData.append('llm_provider', selectedProvider) // Pass selected provider
 
       // Upload to backend
       const response = await fetch('http://localhost:8000/api/v1/analyze', {
@@ -151,6 +154,15 @@ export default function HomePage() {
                 <span>Alto Risco</span>
               </div>
             </div>
+          </div>
+
+          {/* LLM Provider Selection */}
+          <div className="max-w-2xl mx-auto mb-8">
+            <LLMProviderSelector
+              selectedProvider={selectedProvider}
+              onProviderChange={setSelectedProvider}
+              disabled={isUploading}
+            />
           </div>
 
           {/* File Upload Section */}
