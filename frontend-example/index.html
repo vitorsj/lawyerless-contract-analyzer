@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lawyerless - Análise de Contratos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #334155;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        
+        .provider-status-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .current-provider {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .provider-health {
+            display: flex;
+            gap: 16px;
+        }
+        
+        .provider-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        
+        .indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .indicator-dot.green { background: #10b981; }
+        .indicator-dot.red { background: #ef4444; }
+        .indicator-dot.yellow { background: #f59e0b; }
+        
+        .analysis-form {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 24px;
+        }
+        
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #374151;
+        }
+        
+        .file-upload {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 32px;
+            text-align: center;
+            transition: border-color 0.2s;
+            cursor: pointer;
+        }
+        
+        .file-upload:hover {
+            border-color: #3b82f6;
+        }
+        
+        .file-upload.dragover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .provider-selection {
+            margin: 24px 0;
+        }
+        
+        .provider-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .provider-option {
+            position: relative;
+        }
+        
+        .provider-option input[type="radio"] {
+            display: none;
+        }
+        
+        .provider-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            height: 100%;
+        }
+        
+        .provider-option input[type="radio"]:checked + .provider-card {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+        
+        .provider-card:hover {
+            border-color: #9ca3af;
+        }
+        
+        .provider-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .provider-icon {
+            font-size: 18px;
+        }
+        
+        .provider-name {
+            font-weight: 600;
+            flex: 1;
+        }
+        
+        .provider-badge {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        
+        .provider-badge.cloud {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .provider-badge.local {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .provider-details {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .provider-details p {
+            margin: 4px 0;
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+        }
+        
+        .submit-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+        
+        .submit-btn:hover {
+            background: #2563eb;
+        }
+        
+        .submit-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .status-message {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .status-message.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .status-message.error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .status-message.info {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #dbeafe;
+        }
+        
+        @media (max-width: 640px) {
+            .provider-options {
+                grid-template-columns: 1fr;
+            }
+            
+            .provider-status-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚖️ Lawyerless</h1>
+            <p>Análise Inteligente de Contratos de Investimento</p>
+        </div>
+        
+        <!-- Provider Status Bar -->
+        <div class="provider-status-bar">
+            <div class="current-provider">
+                <span>🤖</span>
+                <span>Modelo Atual: <strong id="currentProvider">Carregando...</strong></span>
+            </div>
+            
+            <div class="provider-health">
+                <div class="provider-indicator openai">
+                    <span class="indicator-dot yellow" id="openai-status"></span>
+                    <span>OpenAI</span>
+                </div>
+                <div class="provider-indicator lm-studio">
+                    <span class="indicator-dot yellow" id="lm-studio-status"></span>
+                    <span>LM Studio</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Analysis Form -->
+        <form class="analysis-form" id="analysisForm">
+            <!-- File Upload -->
+            <div class="form-group">
+                <label class="form-label">📄 Contrato para Análise</label>
+                <div class="file-upload" id="fileUpload">
+                    <div>
+                        <p><strong>Clique para selecionar</strong> ou arraste o arquivo PDF aqui</p>
+                        <p style="color: #6b7280; font-size: 14px; margin-top: 8px;">
+                            Máximo 50MB • Formatos: PDF
+                        </p>
+                    </div>
+                    <input type="file" class="file-input" id="fileInput" accept=".pdf" required>
+                </div>
+                <div id="fileName" style="margin-top: 8px; font-weight: 500; color: #059669;"></div>
+            </div>
+            
+            <!-- Perspective Selection -->
+            <div class="form-group">
+                <label class="form-label" for="perspectiva">👁️ Perspectiva da Análise</label>
+                <select class="form-select" id="perspectiva" name="perspectiva" required>
+                    <option value="">Selecione uma perspectiva</option>
+                    <option value="fundador">Fundador/Empreendedor</option>
+                    <option value="investidor">Investidor</option>
+                </select>
+            </div>
+            
+            <!-- LLM Provider Selection -->
+            <div class="provider-selection">
+                <label class="form-label">🤖 Escolha o Modelo de IA</label>
+                
+                <div class="provider-options">
+                    <div class="provider-option">
+                        <input type="radio" id="openai" name="llm_provider" value="openai" checked>
+                        <label for="openai" class="provider-card">
+                            <div class="provider-header">
+                                <span class="provider-icon">☁️</span>
+                                <span class="provider-name">OpenAI GPT-4</span>
+                                <span class="provider-badge cloud">Nuvem</span>
+                            </div>
+                            <div class="provider-details">
+                                <p>• Mais avançado e preciso</p>
+                                <p>• Processamento rápido</p>
+                                <p>• Requer conexão com internet</p>
+                                <p>• Custo por análise</p>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <div class="provider-option">
+                        <input type="radio" id="lm_studio" name="llm_provider" value="lm_studio">
+                        <label for="lm_studio" class="provider-card">
+                            <div class="provider-header">
+                                <span class="provider-icon">🏠</span>
+                                <span class="provider-name">LM Studio Local</span>
+                                <span class="provider-badge local">Local</span>
+                            </div>
+                            <div class="provider-details">
+                                <p>• Totalmente privado</p>
+                                <p>• Sem custos adicionais</p>
+                                <p>• Funciona offline</p>
+                                <p>• Requer LM Studio instalado</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">
+                Analisar Contrato
+            </button>
+            
+            <div class="status-message" id="statusMessage"></div>
+        </form>
+    </div>
+    
+    <script>
+        class LawyerlessApp {
+            constructor() {
+                this.currentProvider = 'openai';
+                this.providerStatus = {};
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.checkProviderStatus();
+                this.loadUserPreferences();
+            }
+            
+            setupEventListeners() {
+                // File upload
+                const fileUpload = document.getElementById('fileUpload');
+                const fileInput = document.getElementById('fileInput');
+                
+                fileUpload.addEventListener('click', () => fileInput.click());
+                fileUpload.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    fileUpload.classList.add('dragover');
+                });
+                fileUpload.addEventListener('dragleave', () => {
+                    fileUpload.classList.remove('dragover');
+                });
+                fileUpload.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    fileUpload.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        fileInput.files = files;
+                        this.updateFileName(files[0].name);
+                    }
+                });
+                
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.updateFileName(e.target.files[0].name);
+                    }
+                });
+                
+                // Provider selection
+                document.querySelectorAll('input[name="llm_provider"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        this.setProvider(e.target.value);
+                    });
+                });
+                
+                // Form submission
+                document.getElementById('analysisForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleFormSubmit(e);
+                });
+            }
+            
+            async checkProviderStatus() {
+                try {
+                    const response = await fetch('/api/v1/llm/providers');
+                    const data = await response.json();
+                    
+                    data.providers.forEach(provider => {
+                        this.providerStatus[provider.provider] = provider.available;
+                        this.updateProviderStatusUI(provider.provider, provider.available);
+                    });
+                    
+                    this.updateCurrentProviderUI();
+                } catch (error) {
+                    console.error('Failed to check provider status:', error);
+                    // Fallback status for demo
+                    this.providerStatus = { openai: true, lm_studio: false };
+                    this.updateProviderStatusUI('openai', true);
+                    this.updateProviderStatusUI('lm_studio', false);
+                    this.updateCurrentProviderUI();
+                }
+            }
+            
+            updateProviderStatusUI(provider, available) {
+                const statusElement = document.getElementById(`${provider.replace('_', '-')}-status`);
+                if (statusElement) {
+                    statusElement.className = `indicator-dot ${available ? 'green' : 'red'}`;
+                }
+                
+                // Disable provider option if not available
+                const radioInput = document.getElementById(provider.replace('_', '-'));
+                const card = radioInput?.nextElementSibling;
+                if (radioInput && card) {
+                    if (!available) {
+                        card.style.opacity = '0.5';
+                        card.style.cursor = 'not-allowed';
+                        if (radioInput.checked) {
+                            // Switch to available provider
+                            const availableProvider = Object.keys(this.providerStatus).find(p => this.providerStatus[p]);
+                            if (availableProvider) {
+                                document.getElementById(availableProvider.replace('_', '-')).checked = true;
+                                this.setProvider(availableProvider);
+                            }
+                        }
+                    } else {
+                        card.style.opacity = '1';
+                        card.style.cursor = 'pointer';
+                    }
+                }
+            }
+            
+            setProvider(providerName) {
+                if (!this.providerStatus[providerName]) {
+                    this.showError(`${providerName === 'lm_studio' ? 'LM Studio' : 'OpenAI'} não está disponível no momento.`);
+                    return false;
+                }
+                
+                this.currentProvider = providerName;
+                this.updateCurrentProviderUI();
+                localStorage.setItem('preferredProvider', providerName);
+                return true;
+            }
+            
+            updateCurrentProviderUI() {
+                const names = {
+                    'openai': 'OpenAI GPT-4',
+                    'lm_studio': 'LM Studio Local'
+                };
+                
+                const element = document.getElementById('currentProvider');
+                if (element) {
+                    element.textContent = names[this.currentProvider] || 'Carregando...';
+                }
+            }
+            
+            updateFileName(fileName) {
+                const element = document.getElementById('fileName');
+                element.textContent = `📄 ${fileName}`;
+            }
+            
+            loadUserPreferences() {
+                const savedProvider = localStorage.getItem('preferredProvider');
+                if (savedProvider && this.providerStatus[savedProvider]) {
+                    const radio = document.getElementById(savedProvider.replace('_', '-'));
+                    if (radio) {
+                        radio.checked = true;
+                        this.setProvider(savedProvider);
+                    }
+                }
+            }
+            
+            async handleFormSubmit(e) {
+                const formData = new FormData(e.target);
+                const submitBtn = document.getElementById('submitBtn');
+                
+                // Validate provider selection
+                if (!this.providerStatus[this.currentProvider]) {
+                    this.showError('Provedor selecionado não está disponível.');
+                    return;
+                }
+                
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Analisando...';
+                this.showInfo('Enviando contrato para análise...');
+                
+                try {
+                    const response = await fetch('/api/v1/analyze', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || `HTTP ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    this.showSuccess(`Análise iniciada! ID do documento: ${result.document_id}`);
+                    
+                    // In a real app, you would redirect to results page or start polling
+                    setTimeout(() => {
+                        window.location.href = `/analysis/${result.document_id}`;
+                    }, 2000);
+                    
+                } catch (error) {
+                    this.showError(`Erro na análise: ${error.message}`);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Analisar Contrato';
+                }
+            }
+            
+            showMessage(message, type) {
+                const statusMessage = document.getElementById('statusMessage');
+                statusMessage.textContent = message;
+                statusMessage.className = `status-message ${type}`;
+                statusMessage.style.display = 'block';
+                
+                if (type === 'success' || type === 'info') {
+                    setTimeout(() => {
+                        statusMessage.style.display = 'none';
+                    }, 5000);
+                }
+            }
+            
+            showSuccess(message) { this.showMessage(message, 'success'); }
+            showError(message) { this.showMessage(message, 'error'); }
+            showInfo(message) { this.showMessage(message, 'info'); }
+        }
+        
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new LawyerlessApp();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+# Development Dockerfile for Lawyerless Frontend
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for PDF.js and development tools
+RUN apk add --no-cache \
+    # Development tools
+    curl \
+    git \
+    # PDF.js dependencies
+    cairo-dev \
+    pango-dev \
+    # Build dependencies
+    python3 \
+    make \
+    g++
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001 -G nodejs
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=development && \
+    npm cache clean --force
+
+# Create necessary directories and set permissions
+RUN mkdir -p .next && \
+    chown -R nextjs:nodejs /app
+
+# Copy application code
+COPY . .
+
+# Create startup script
+RUN echo '#!/bin/sh\n\
+set -e\n\
+\n\
+# Wait for backend to be ready\n\
+echo "Waiting for backend..."\n\
+while ! nc -z backend 8000; do\n\
+  sleep 1\n\
+done\n\
+echo "Backend is ready!"\n\
+\n\
+# Start Next.js in development mode\n\
+echo "Starting Lawyerless Frontend in development mode..."\n\
+exec npm run dev\n\
+' > /app/start-dev.sh && chmod +x /app/start-dev.sh
+
+# Set ownership
+RUN chown -R nextjs:nodejs /app
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
+
+# Start command
+CMD ["/app/start-dev.sh"]

@@ -1,0 +1,50 @@
+# Development dependencies for Lawyerless Backend
+
+# Testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-xdist>=3.3.0
+
+# Code quality and formatting
+black>=23.7.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.5.0
+bandit>=1.7.5
+
+# Development tools
+pre-commit>=3.3.0
+ipython>=8.14.0
+ipdb>=0.13.13
+python-dotenv>=1.0.0
+
+# Documentation
+mkdocs>=1.5.0
+mkdocs-material>=9.1.0
+mkdocs-mermaid2-plugin>=1.1.0
+
+# Performance monitoring
+memory-profiler>=0.61.0
+py-spy>=0.3.14
+
+# API development
+httpx>=0.24.0  # For making HTTP requests in tests
+faker>=19.3.0  # For generating fake data in tests
+
+# Database tools (if using database)
+alembic>=1.11.0
+sqlalchemy-utils>=0.41.0
+
+# Async development tools
+aiofiles>=23.1.0
+aioredis>=2.0.0
+
+# Security testing
+safety>=2.3.0
+semgrep>=1.31.0
+
+# Environment management
+python-decouple>=3.8
+pydantic-settings>=2.0.0
