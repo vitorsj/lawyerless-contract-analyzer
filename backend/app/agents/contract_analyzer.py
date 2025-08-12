@@ -268,6 +268,7 @@ class ContractAnalyzer:
                     "total_pages": extraction_result.metadata.page_count,
                 },
                 tags=["contract", "analysis", perspectiva, self.llm_provider or settings.llm_provider],
+                enabled=True,
             )
             async def _run_contract_analysis_inner():
                 try:
@@ -359,6 +360,7 @@ class ContractAnalyzer:
                     "numbered" if clause.clause_number else "paragraph",
                     f"level_{clause.level or 1}",
                 ],
+                enabled=True,
             )
             async def _run_clause_analysis_inner():
                 try:
@@ -393,6 +395,7 @@ class ContractAnalyzer:
                             "numbered" if clause.clause_number else "paragraph",
                             f"level_{clause.level or 1}",
                         ],
+                        enabled=True,
                     )
                     async def _traced_llm_run():
                         return await agent_to_use.run(clause_prompt, deps=dependencies)

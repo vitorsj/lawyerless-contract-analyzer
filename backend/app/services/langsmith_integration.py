@@ -66,6 +66,11 @@ class LangSmithTracer:
             os.environ["LANGSMITH_API_KEY"] = settings.langsmith_api_key
             os.environ["LANGSMITH_PROJECT"] = settings.langsmith_project
             os.environ["LANGSMITH_ENDPOINT"] = settings.langsmith_endpoint
+            # Ensure LangChain v2 tracing variables are also set for decorators/helpers
+            os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+            os.environ["LANGCHAIN_API_KEY"] = settings.langsmith_api_key
+            os.environ["LANGCHAIN_PROJECT"] = settings.langsmith_project
+            os.environ["LANGCHAIN_ENDPOINT"] = settings.langsmith_endpoint
             
             # Initialize client
             self.client = Client(
@@ -191,7 +196,10 @@ class LangSmithTracer:
             with tracing_context(
                 name="contract_analysis",
                 metadata=metadata,
-                tags=["contract", "analysis", perspectiva, llm_provider]
+                tags=["contract", "analysis", perspectiva, llm_provider],
+                project_name=settings.langsmith_project,
+                enabled=True,
+                client=self.client
             ) as trace:
                 yield trace
                 
@@ -248,7 +256,10 @@ class LangSmithTracer:
             with tracing_context(
                 name="clause_analysis",
                 metadata=metadata,
-                tags=["clause", "analysis", pattern_type, f"level_{clause_level}"]
+                tags=["clause", "analysis", pattern_type, f"level_{clause_level}"],
+                project_name=settings.langsmith_project,
+                enabled=True,
+                client=self.client
             ) as trace:
                 yield trace
                 
