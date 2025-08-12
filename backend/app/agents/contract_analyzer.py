@@ -378,10 +378,26 @@ class ContractAnalyzer:
                         # Register tools with temporary agent
                         self._register_tools_with_agent(agent_to_use)
 
-                    # Run analysis with retry logic
-                    result = await self._run_with_retry(
-                        lambda: agent_to_use.run(clause_prompt, deps=dependencies)
+                    # Run analysis with retry logic, instrumented as a dedicated span
+                    @ls_traceable(
+                        name="llm_clause_run",
+                        metadata={
+                            "clause_id": clause.clause_id,
+                            "clause_number": clause.clause_number,
+                            "clause_level": clause.level or 1,
+                            "clause_length": len(clause.text),
+                        },
+                        tags=[
+                            "llm",
+                            "clause",
+                            "numbered" if clause.clause_number else "paragraph",
+                            f"level_{clause.level or 1}",
+                        ],
                     )
+                    async def _traced_llm_run():
+                        return await agent_to_use.run(clause_prompt, deps=dependencies)
+
+                    result = await self._run_with_retry(_traced_llm_run)
 
                     # Extract analysis from result and ensure coordinates are preserved
                     if hasattr(result, "output"):
