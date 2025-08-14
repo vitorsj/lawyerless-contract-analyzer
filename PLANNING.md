@@ -68,21 +68,59 @@ Lawyerless/
 │   │   ├── services/       # Core business logic
 │   │   │   ├── pdf_processor.py      # PDF text extraction
 │   │   │   ├── clause_segmenter.py   # Brazilian clause patterns
-│   │   │   └── contract_extractor.py # Structured data extraction
+│   │   │   ├── contract_extractor.py # Structured data extraction
+│   │   │   ├── docling_processor.py  # Alternative PDF processor
+│   │   │   ├── advanced_clause_extractor.py # Enhanced extraction
+│   │   │   ├── extraction_reporter.py # Analysis reporting
+│   │   │   ├── langsmith_integration.py # LLM observability
+│   │   │   └── llm_providers.py     # Multi-provider LLM support
 │   │   ├── api/           # REST endpoints
 │   │   │   └── routes.py  # FastAPI routes
 │   │   ├── models.py      # Pydantic data models
 │   │   ├── settings.py    # Configuration management
 │   │   └── main.py        # FastAPI application
-│   └── tests/             # Pytest test suite
+│   ├── tests/             # Pytest test suite (TO BE CREATED)
+│   ├── extraction_reports/ # Generated analysis reports
+│   ├── requirements.txt   # Production dependencies
+│   ├── requirements-dev.txt # Development dependencies
+│   └── venv_linux/        # Python virtual environment
 ├── frontend/              # Next.js React frontend
 │   ├── src/
 │   │   ├── app/          # Next.js 14 app router
 │   │   ├── components/   # React components (< 500 lines each)
+│   │   │   ├── AnalysisPanel.tsx    # Clause analysis display
+│   │   │   ├── ContractSummary.tsx  # Contract overview card
+│   │   │   ├── FileUpload.tsx       # PDF upload interface
+│   │   │   ├── LLMProviderSelector.tsx # Provider selection
+│   │   │   └── PDFViewer.tsx        # PDF.js integration
 │   │   ├── hooks/        # Custom React hooks
+│   │   │   ├── useContractAnalysis.ts # API integration
+│   │   │   ├── useLocalStorage.ts   # Local state persistence
+│   │   │   ├── usePDFViewer.ts      # PDF viewing logic
+│   │   │   └── useWebSocket.ts      # Real-time updates
 │   │   ├── types/        # TypeScript type definitions
+│   │   │   └── index.ts  # Contract analysis types
 │   │   └── utils/        # Utility functions
-└── docker-compose.yml    # Development environment
+│   │       └── pdfjs-config.ts # PDF.js configuration
+│   ├── public/
+│   │   └── pdf-worker.js # PDF.js worker for processing
+│   ├── package.json      # Node.js dependencies
+│   ├── next.config.js    # Next.js configuration
+│   ├── tailwind.config.js # Styling configuration
+│   └── tsconfig.json     # TypeScript configuration
+├── docker/               # Docker configurations
+│   ├── postgres/         # PostgreSQL setup
+│   └── redis/           # Redis configuration
+├── scripts/             # Development scripts
+│   └── dev-setup.sh     # Environment setup
+├── PRPs/                # Project Requirements & Planning
+│   └── lawyerless-contract-analyzer.md # Comprehensive PRP
+├── docker-compose.yml   # Development environment
+├── Makefile            # Development commands
+├── CLAUDE.md           # AI coding instructions
+├── PLANNING.md         # This architecture document
+├── TASK.md             # Task management
+└── README.md           # Project overview and setup
 ```
 
 ## 🧠 AI Analysis Pipeline
@@ -257,10 +295,25 @@ make test       # pytest + jest
 ## 🔄 Future Roadmap
 
 ### Phase 1 (Current) - MVP
-- ✅ Core PDF processing pipeline
-- ✅ PydanticAI integration  
-- ✅ Basic risk flagging
-- ✅ Portuguese explanations
+- ✅ Core PDF processing pipeline (pdf_processor.py, docling_processor.py)
+- ✅ PydanticAI integration (contract_analyzer.py with 0.6.2)
+- ✅ Advanced clause extraction (advanced_clause_extractor.py)
+- ✅ LangSmith observability (langsmith_integration.py)
+- ✅ Multi-provider LLM support (llm_providers.py)
+- ✅ Portuguese explanations and prompts
+- ✅ Next.js frontend with PDF.js integration
+- ✅ TypeScript type safety throughout
+- ⚠️ Test suite needs creation (tests/ directory missing)
+- ⚠️ End-to-end workflow testing needed
+
+### 🔥 CRÍTICO - Melhorias de Produto (2025-08-14)
+- 🚨 **Extração de contratos precisa melhorar** - Está ruim, reformular
+- 🎯 **Perspectiva sempre pro-investidor** - Análise deve defender investidor
+- ❌ **Remover perguntas de negociação** - Funcionalidade descontinuada
+- 💬 **Mostrar complexidade para usuário** - LLM não está sendo exibido
+- ❌ **Remover TLDR** - Simplificar interface
+- ❌ **Remover resumo do contrato** - Foco só nas cláusulas
+- 📝 **Atualizar prompts** - Reescrever para foco no investidor
 
 ### Phase 2 - Enhancement
 - Multi-language support (English)

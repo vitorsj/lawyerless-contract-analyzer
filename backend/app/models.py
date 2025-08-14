@@ -120,21 +120,14 @@ class ClauseAnalysis(BaseModel):
     titulo: Optional[str] = Field(None, description="Clause title/header")
     texto_original: str = Field(..., description="Original clause text")
     
-    # Core analysis fields
-    tldr: str = Field(..., max_length=200, description="1-2 sentence summary in Portuguese")
+    # Core analysis fields  
     explicacao_simples: str = Field(..., description="Simple Portuguese explanation for laypeople")
-    porque_importa: str = Field(..., description="Why this matters / practical impact")
+    porque_importa: str = Field(..., description="Why this matters / practical impact for the INVESTOR")
+    complexidade: str = Field(..., description="Detailed analysis of complex terms and implications")
     
-    # Risk assessment
-    bandeira: Bandeira = Field(..., description="Risk flag color")
-    motivo_bandeira: str = Field(..., description="Reason for the flag color")
-    
-    # Actionable insights
-    perguntas_negociacao: List[str] = Field(
-        ..., 
-        max_items=5, 
-        description="Negotiation questions in Portuguese"
-    )
+    # Risk assessment (always from investor perspective)
+    bandeira: Bandeira = Field(..., description="Risk flag color from investor perspective")
+    motivo_bandeira: str = Field(..., description="Reason for the flag color - investor focus")
     
     # Advanced analysis
     geral_vs_contrato: Optional[ExplicacaoGeraleContrato] = Field(
