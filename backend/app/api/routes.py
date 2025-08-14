@@ -24,7 +24,7 @@ from ..models import (
     ContractAnalysisResponse,
     AnalysisStatus
 )
-from ..services import PDFProcessor, ClauseSegmenter, ContractExtractor
+from ..services import PDFProcessor, DoclingProcessor, ClauseSegmenter, ContractExtractor
 from ..services.llm_providers import list_available_providers, get_provider_info
 from ..services.langsmith_integration import get_tracing_status
 from ..agents import analyze_contract_clauses
@@ -153,24 +153,41 @@ async def process_contract_analysis(
             "Iniciando processamento do PDF..."
         )
         
-        # Step 1: PDF Processing
+        # Step 1: PDF Processing with Docling (fallback to PDFProcessor if needed)
         logger.info(f"Starting PDF processing for {document_id}")
-        pdf_processor = PDFProcessor()
-        extraction_result = await pdf_processor.extract_text_with_coordinates(
-            file_content, filename
-        )
+        try:
+            # Try Docling first for superior extraction
+            docling_processor = DoclingProcessor()
+            extraction_result = await docling_processor.extract_text_with_coordinates(
+                file_content, filename
+            )
+            logger.info(f"Successfully used Docling for {document_id}")
+        except Exception as e:
+            logger.warning(f"Docling failed for {document_id}, falling back to PDFProcessor: {e}")
+            # Fallback to original PDFProcessor
+            pdf_processor = PDFProcessor()
+            extraction_result = await pdf_processor.extract_text_with_coordinates(
+                file_content, filename
+            )
         
         await update_analysis_status(
             document_id, 
             "processing", 
             30, 
-            "PDF processado. Segmentando cláusulas..."
+            "PDF processado. Verificando cláusulas identificadas..."
         )
         
-        # Step 2: Clause Segmentation
-        logger.info(f"Starting clause segmentation for {document_id}")
-        segmenter = ClauseSegmenter()
-        clauses = await segmenter.segment_clauses(extraction_result)
+        # Step 2: Clause Verification (Docling already segments, ClauseSegmenter used as fallback)
+        logger.info(f"Verifying clauses for {document_id}")
+        if extraction_result.extraction_method == "docling" and extraction_result.clauses:
+            # Docling already identified clauses, use them directly
+            clauses = extraction_result.clauses
+            logger.info(f"Using Docling-identified clauses: {len(clauses)} found")
+        else:
+            # Use ClauseSegmenter for additional processing or as fallback
+            logger.info(f"Using ClauseSegmenter for clause identification")
+            segmenter = ClauseSegmenter()
+            clauses = await segmenter.segment_clauses(extraction_result)
         
         await update_analysis_status(
             document_id, 

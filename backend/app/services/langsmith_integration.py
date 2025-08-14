@@ -195,6 +195,15 @@ class LangSmithTracer:
         try:
             with tracing_context(
                 name="contract_analysis",
+                inputs={
+                    "document_id": document_id,
+                    "filename": filename,
+                    "perspectiva": perspectiva,
+                    "llm_provider": llm_provider,
+                    "total_clauses": total_clauses,
+                    "total_pages": total_pages,
+                    "file_size_mb": round(file_size / (1024 * 1024), 2),
+                },
                 metadata=metadata,
                 tags=["contract", "analysis", perspectiva, llm_provider],
                 project_name=settings.langsmith_project,
@@ -255,6 +264,13 @@ class LangSmithTracer:
         try:
             with tracing_context(
                 name="clause_analysis",
+                inputs={
+                    "clause_id": clause_id,
+                    "clause_number": clause_number,
+                    "clause_level": clause_level,
+                    "clause_length": clause_length,
+                    "pattern_type": pattern_type,
+                },
                 metadata=metadata,
                 tags=["clause", "analysis", pattern_type, f"level_{clause_level}"],
                 project_name=settings.langsmith_project,

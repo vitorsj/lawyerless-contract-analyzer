@@ -75,18 +75,6 @@ Build Lawyerless MVP - a web application that analyzes Brazilian investment cont
   why: ContractEval benchmark - clause-level legal risk identification best practices
   critical: Open-source LLMs need fine-tuning for legal accuracy, focus on recall over precision
 
-- url: https://zuva.ai/blog/problems-with-prompts-measurability-predictability-of-llm-accuracy/
-  why: LLM accuracy challenges in contract analysis
-  critical: Contract users care more about recall (avoiding misses) than precision
-
-- url: https://medium.com/@nayan.j.paul/extract-contract-details-using-llm-and-gen-ai-a196f84f96c5
-  why: LLM structured output patterns for contract data extraction
-  critical: Function calling with JSON schema for consistent contract parsing
-
-# Brazilian Legal Context
-- url: https://nvca.org/model-legal-documents/
-  why: Standard investment agreement structures (adapt to Brazilian context)
-  critical: SAFE agreements, convertible notes, term sheet patterns
 
 # FastAPI + PydanticAI Patterns  
 - file: use-cases/pydantic-ai/examples/main_agent_reference/agent.py
@@ -206,10 +194,6 @@ Lawerless/
 # PDFs can be large - configure FastAPI max file size
 # Use streaming for large files, implement progress indicators
 
-# CRITICAL: pdfplumber vs pypdf choice
-# pdfplumber: Better for coordinate extraction, table detection, complex layouts
-# pypdf: Faster for simple text extraction, better for PDF manipulation
-# Use pdfplumber as primary, pypdf as fallback
 
 # CRITICAL: LLM token limits  
 # Investment contracts can be 50+ pages, exceed context windows

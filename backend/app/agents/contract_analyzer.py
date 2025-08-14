@@ -239,6 +239,22 @@ class ContractAnalyzer:
         logger.info(f"Starting full contract analysis for {extraction_result.document_id}")
         logger.info(f"Analyzing {len(clauses)} clauses from perspective: {perspectiva}")
         
+        # ===== INITIAL CLAUSE INPUT SUMMARY =====
+        print(f"\n{'='*80}")
+        print(f"📥 CLAUSES RECEIVED FROM DOCLING/PDF PROCESSOR")
+        print(f"{'='*80}")
+        print(f"📋 Document ID: {extraction_result.document_id}")
+        print(f"📋 Extraction Method: {extraction_result.extraction_method}")
+        print(f"📋 Total Clauses Received: {len(clauses)}")
+        print(f"📋 Analysis Perspective: {perspectiva}")
+        print(f"\n📄 RECEIVED CLAUSE NUMBERS:")
+        for i, clause in enumerate(clauses):
+            clause_num = clause.clause_number or f"unnumbered_{i+1}"
+            chars = len(clause.text)
+            page = clause.coordinates.page_number if clause.coordinates else "N/A"
+            print(f"  {i+1:2d}. {clause_num:<8} | {chars:4d} chars | Page {page} | {clause.title[:50]}...")
+        print(f"{'='*80}\n")
+        
         # Initialize LangSmith tracing context (sets parent metadata)
         with tracer.trace_contract_analysis(
             document_id=extraction_result.document_id,
@@ -337,6 +353,29 @@ class ContractAnalyzer:
         """
         logger.info(f"Analyzing clause: {clause.clause_id}")
         
+        # ===== DETAILED CLAUSE DEBUG OUTPUT =====
+        print(f"\n{'='*80}")
+        print(f"🔍 SENDING CLAUSE TO LLM")
+        print(f"{'='*80}")
+        print(f"📋 Clause ID: {clause.clause_id}")
+        print(f"📋 Clause Number: {clause.clause_number}")
+        print(f"📋 Clause Title: {clause.title}")
+        print(f"📋 Clause Level: {clause.level}")
+        print(f"📋 Text Length: {len(clause.text)} characters")
+        print(f"📋 Coordinates: Page {clause.coordinates.page_number if clause.coordinates else 'N/A'}")
+        print(f"📋 LLM Provider: {dependencies.llm_provider or settings.llm_provider}")
+        print(f"\n📄 CLAUSE CONTENT:")
+        print(f"{'-'*60}")
+        # Show first 500 characters and last 200 characters if text is long
+        if len(clause.text) <= 700:
+            print(clause.text)
+        else:
+            print(f"{clause.text[:500]}")
+            print(f"\n[... truncated {len(clause.text) - 700} characters ...]\n")
+            print(f"{clause.text[-200:]}")
+        print(f"{'-'*60}")
+        print(f"{'='*80}\n")
+        
         # Initialize LangSmith tracing for individual clause (parent context)
         with tracer.trace_clause_analysis(
             clause_id=clause.clause_id,
@@ -397,10 +436,10 @@ class ContractAnalyzer:
                         ],
                         enabled=True,
                     )
-                    async def _traced_llm_run():
-                        return await agent_to_use.run(clause_prompt, deps=dependencies)
+                    async def _traced_llm_run(prompt: str, deps: AnalysisDependencies):
+                        return await agent_to_use.run(prompt, deps=deps)
 
-                    result = await self._run_with_retry(_traced_llm_run)
+                    result = await self._run_with_retry(lambda: _traced_llm_run(clause_prompt, dependencies))
 
                     # Extract analysis from result and ensure coordinates are preserved
                     if hasattr(result, "output"):
@@ -487,6 +526,31 @@ class ContractAnalyzer:
                 for clause in batch:
                     fallback = self._create_fallback_analysis(clause, str(e))
                     analyzed_clauses.append(fallback)
+        
+        # ===== FINAL CLAUSE PROCESSING SUMMARY =====
+        print(f"\n{'='*80}")
+        print(f"📊 FINAL CLAUSE PROCESSING SUMMARY")
+        print(f"{'='*80}")
+        print(f"📋 Total Clauses Processed: {len(analyzed_clauses)}")
+        print(f"📋 Successfully Analyzed: {len([c for c in analyzed_clauses if not hasattr(c, '_is_fallback')])}")
+        print(f"📋 Fallback Analyses: {len([c for c in analyzed_clauses if hasattr(c, '_is_fallback')])}")
+        print(f"\n📄 CLAUSE NUMBERS SENT TO LLM:")
+        for i, clause_analysis in enumerate(analyzed_clauses):
+            clause_number = clause_analysis.clause_id.split('_')[-1] if hasattr(clause_analysis, 'clause_id') else f"clause_{i+1}"
+            # Try to extract clause number from original clause data if available
+            original_clause_number = "Unknown"
+            if hasattr(clause_analysis, 'clause_id'):
+                # Look for clause number in the analyzed result
+                if hasattr(clause_analysis, 'titulo') and clause_analysis.titulo:
+                    # Extract number from title like "2.6. Características..."
+                    import re
+                    number_match = re.match(r'^(\d+(?:\.\d+)?)', clause_analysis.titulo)
+                    if number_match:
+                        original_clause_number = number_match.group(1)
+            
+            status = "✅ Success" if not hasattr(clause_analysis, '_is_fallback') else "❌ Fallback"
+            print(f"  {i+1:2d}. Clause {original_clause_number:<6} | {status}")
+        print(f"{'='*80}\n")
         
         return analyzed_clauses
     
